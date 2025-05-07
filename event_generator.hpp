@@ -17,7 +17,7 @@ using ordered_set = tree<
     tree_order_statistics_node_update>;
 
 
-// jobs
+// jobs (for use in simulations)
 struct Job {
     size_t job_id;           // used by the scheduler to differentiate jobs
     long double arrival_time;
