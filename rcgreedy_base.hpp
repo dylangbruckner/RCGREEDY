@@ -4,28 +4,31 @@
 #include <cmath>
 #include <unordered_map>
 #include <unordered_set>
+#include <algorithm>
+#include <utility>
+#include <iostream>
 
 const double EPSILON = 1e-6; // used for floating point calculations
-
 class RCGREEDY {
     static constexpr int MAX_DEPTH = 10;  // maximum recursion depth of our scheduler 
 
 public:
     struct RCGREEDY_Job {
-        size_t id;
-        size_t insert_order;
-        double p;
+        size_t id = 0;
+        double p = 0.0;
+
+        RCGREEDY_Job() = default;
 
         bool operator<(const RCGREEDY_Job& other) const {
-            return insert_order < other.insert_order;
+            return id < other.id;
         }
 
-        bool operator=(const RCGREEDY_Job& other) const {
+        bool operator==(const RCGREEDY_Job& other) const {
             return id == other.id;
         }
     };
 
-    RCGREEDY(size_t servers, int max_depth, double lambda);
+    RCGREEDY(size_t servers, int max_depth, double average_size, bool partial_server_allocs = false);
 
     /*
     * performa a full reallocation of the entire system, based on the RCGREEDY
@@ -45,8 +48,32 @@ public:
     * there are jobs
     */
     void delete_job(RCGREEDY_Job &Job, bool forced_local_realloc);
+    /*
+    * returns the server count allocated to any job. 
+    * For large scale server allocation numbers, get_server_changes, 
+    * get job_group_server_count, and get_all_server_count are more 
+    * efficient
+    */
+    double get_server_count(RCGREEDY_Job &job);
 
-
+    /*
+    * adds the server count allocated to any job group to the given vector, as a vector of 
+    * pairs of job id's and allocated servers. If partial allocation is on,
+    * all of the allocations will be equal.
+    */
+    void get_job_group_server_count(RCGREEDY_Job &job, std::vector<std::pair<size_t, double>> &input);
+    
+     /*
+    * gets the server count of every job and adds it to the vector input
+    */
+    void get_all_server_count(std::vector<std::pair<size_t, double>> &input);
+    
+    // todo maybe add an option to turn this off
+    /*
+    * returns a vector of any jobs (as ids) and their allocations (as doubles) that have changed
+    * in the last insertion/deletion or server update. 
+    */
+    std::vector<std::pair<size_t, double>> get_server_changes(RCGREEDY_Job &job);
     /*
     * returns the speedup factor of any job with p as the speedup 
     * parameter and servers allocated servers
@@ -58,29 +85,43 @@ public:
 
 private:
 
+
+    // 'custom' hash function for mapping RCGREEDY_Jobs
+    struct Job_Hash {
+        size_t operator()(const RCGREEDY_Job& job) const {
+            return std::hash<size_t>{}(job.id);
+        }
+    };
+
     // groups of servers, lazyily updated
     struct Group {
         size_t job_count = 0;                   // total jobs in this group
         size_t allocated_servers = 0;           // number of servers available in group
         size_t update_count = 0;                // if server count is old, this will be less than parent groups   
         double total_p = 0.0;                   // total p-value of all jobs within group
-        double p_min, p_max;                    // range of group (p_min, p_max] (last group is (p_min, 1))
     };
 
-    std::unordered_map<std::string, Group> groups;                 // mapping of group id strings to their groups
-    std::unordered_map<size_t, std::string> job_group_assignments; // maps jobs to their group id
-    std::unordered_set<RCGREEDY_Job> current_jobs;                 // contains all jobs currently in the scheduler
+    std::unordered_map<std::string, Group> groups;                         // mapping of group id strings to their groups
+    std::unordered_map<std::string, std::unordered_set<RCGREEDY_Job, Job_Hash>> id_to_jobs; // mapping of group id strings to sorted vector of jobs in group, only for lowest group
+    std::unordered_map<RCGREEDY_Job, std::string, Job_Hash> job_group_assignments;   // maps jobs to their group id
+
     size_t server_count;
     int current_depth;
-    size_t max_update;      // todo delete this probably
-    double job_size_lambda; // lambda in exponential distriubtion of job size
-    size_t input_count = 0; // unique ordering id for inputs
+    size_t max_update = 0;            
+    double maximization_constant; // see GREEDY* optimization formula. 1/E(X), where X is the job size distribution
+
+    bool partial_servers;         // if true, jobs can utilize portions of servers; otherwise, they need a whole number of servers to operate
+
+    std::vector<std::pair<size_t, double>> history; // vector containing recent (last insert/delete changes) server allocations
 
     // initalizes all mappings of strings to groups
     void initalize_groups();
 
     // recursive helper for initialize groups
     void generate_mappings(double c_p_min, double c_p_max, std::string c_string, int remaining_depth);
+
+    // gets the server count for all elements in group
+    void get_group_server_count(const std::string &group, std::vector<std::pair<size_t, double>> &input);
 
     // gets smallest group id for any given job
     std::string get_group_id(RCGREEDY_Job &job);
@@ -97,8 +138,8 @@ private:
         size_t a1 = 0;
         double max_value = 0.0;
         double current_value;
-        double const_1 = jobs_count_1 * job_size_lambda;
-        double const_2 = jobs_count_2 * job_size_lambda;
+        double const_1 = jobs_count_1 * maximization_constant;
+        double const_2 = jobs_count_2 * maximization_constant;
 
         for (size_t temp_a1 = 0; temp_a1 <= total_servers; ++temp_a1) {
             current_value = const_1 * speedup_factor(p1, temp_a1 / jobs_count_1) + const_2 * speedup_factor(p2, (total_servers - temp_a1) / jobs_count_2);
