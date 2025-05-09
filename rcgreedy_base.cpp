@@ -147,6 +147,7 @@ double RCGREEDY::get_server_count(RCGREEDY_Job &job) {
         remainder -= 1;
         if (remainder == 0) return base;
     }
+    return base;
 }
 
 void RCGREEDY::get_job_group_server_count(RCGREEDY_Job &job, std::vector<std::pair<size_t, double>> &input) {
@@ -165,6 +166,7 @@ void RCGREEDY::get_job_group_server_count(RCGREEDY_Job &job, std::vector<std::pa
 }
 
 void RCGREEDY::get_all_server_count(std::vector<std::pair<size_t, double>> &input) {
+    
     // iterate through only the lowest level ids
     for (const auto& pair : id_to_jobs) {
         get_group_server_count(pair.first, input);
@@ -175,7 +177,6 @@ void RCGREEDY::get_all_server_count(std::vector<std::pair<size_t, double>> &inpu
 
 
 void RCGREEDY::get_group_server_count(const std::string &group, std::vector<std::pair<size_t, double>> &input) {
-    
 
     double server_alloc = 0.0;
     size_t remainder = 0;

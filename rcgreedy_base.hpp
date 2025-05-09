@@ -1,12 +1,13 @@
 #ifndef RCGREEDY_BASE_HPP
 #define RCGREEDY_BASE_HPP
-#include "event_generator.hpp"
+
 #include <cmath>
 #include <unordered_map>
-#include <unordered_set>
 #include <algorithm>
 #include <utility>
+#include <unordered_set>
 #include <iostream>
+#include <vector>
 
 const double EPSILON = 1e-6; // used for floating point calculations
 class RCGREEDY {

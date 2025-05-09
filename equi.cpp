@@ -1,39 +1,74 @@
 #include "equi.hpp"
 
-EQUI::EQUI(size_t servers) : server_count(servers) {}
+EQUI::EQUI(size_t servers, bool partial_server_allocs = false) : server_count(servers), partial_servers(partial_server_allocs) {}
 
 bool EQUI::job_exists(size_t job_id) {
-    return job_map.find(job_id) != job_map.end();
+    return jobs.find(job_id) != jobs.end();
 }
 
 void EQUI::insert_job(size_t job_id) {
     if (!job_exists(job_id)) {
-        Scheduled_Job j{job_id, insertion_count++};
-        jobs.insert(j);
-        job_map[job_id] = j;
+        jobs.insert(job_id);
+    } else {
+        std::cerr << "Error adding job " << job_id << ". Job already exists" << std::endl;
     }
 }
 
 void EQUI::delete_job(size_t job_id) {
-    auto it = job_map.find(job_id);
-    if (it != job_map.end()) {
-        jobs.erase(it->second);
-        job_map.erase(it);
+    if (job_exists(job_id)) {
+        jobs.erase(job_id);
+    } else {
+        std::cerr << "Error deleting job " << job_id << ". Job doesn't exist" << std::endl;
     }
 }
 
 size_t EQUI::get_allocation(size_t job_id) const{
-    auto it = job_map.find(job_id);
-    if (it == job_map.end()) return 0;
     
-    const size_t total_jobs = jobs.size();
-    if (total_jobs == 0) return 0;
+    // if partial servers, this is trivial
+    if (partial_servers){ 
+        return static_cast<double>(partial_servers) / jobs.size();
+    }
+
+    double server_alloc = static_cast<double>(partial_servers / jobs.size()) + 1;
+    size_t remainder = partial_servers % jobs.size();
     
-    const size_t rank = jobs.order_of_key(it->second);
-    const size_t base = server_count / total_jobs;
-    const size_t remainder = server_count % total_jobs;
+
+    // if it is one of the first jobs, it gets the remainder servers, otherwise it does not
+    for (const size_t job_ids : jobs) {
+        if (!remainder) return server_alloc - 1;
+        if (job_ids == job_id) return server_alloc;
+        remainder -= 1;
+    }
+    return server_alloc - 1;
+}
+
+void EQUI::get_all_allocations(std::vector<std::pair<size_t, double>> &input) {
+    double server_alloc = 0.0;
+    size_t remainder = 0;
+    bool flip = true;
+
+    // if partial servers, this is trivial
+    if (partial_servers){ 
+        server_alloc = static_cast<double>(partial_servers) / jobs.size();
+    } else {
+        server_alloc = static_cast<double>(partial_servers / jobs.size()) + 1;
+        remainder = partial_servers % jobs.size();
+        flip = false;
+    }
     
-    return (rank < remainder) ? base + 1 : base;
+
+    // if it is one of the first jobs, it gets the remainder servers, otherwise it does not
+    for (const size_t job_id : jobs) {
+        if (remainder > 0) {
+            remainder -= 1;
+        } else if (!flip) {
+            server_alloc -= 1;
+            flip = true;
+        }
+        input.push_back({job_id, server_alloc});
+    }
+
+    return;
 }
 
 size_t EQUI::get_server_count() const { return server_count; }
