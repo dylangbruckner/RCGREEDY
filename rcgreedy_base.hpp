@@ -55,7 +55,7 @@ public:
     * get job_group_server_count, and get_all_server_count are more 
     * efficient
     */
-    double get_server_count(RCGREEDY_Job &job);
+    const double get_server_count(RCGREEDY_Job &job);
 
     /*
     * adds the server count allocated to any job group to the given vector, as a vector of 
@@ -74,16 +74,17 @@ public:
     * returns a vector of any jobs (as ids) and their allocations (as doubles) that have changed
     * in the last insertion/deletion or server update. 
     */
-    std::vector<std::pair<size_t, double>> get_server_changes(RCGREEDY_Job &job);
+    const std::vector<std::pair<size_t, double>> get_server_changes(RCGREEDY_Job &job);
     /*
     * returns the speedup factor of any job with p as the speedup 
     * parameter and servers allocated servers
     */
-    inline double speedup_factor(double p, double servers) {
+    const inline double speedup_factor(double p, double servers) {
         return 1.0 / ((p / servers) + 1 - p);
     }
     
-
+    const int current_depth;
+    const bool partial_servers;         // if true, jobs can utilize portions of servers; otherwise, they need a whole number of servers to operate
 private:
 
 
@@ -107,11 +108,11 @@ private:
     std::unordered_map<RCGREEDY_Job, std::string, Job_Hash> job_group_assignments;   // maps jobs to their group id
 
     size_t server_count;
-    int current_depth;
+    
     size_t max_update = 0;            
     double maximization_constant; // see GREEDY* optimization formula. 1/E(X), where X is the job size distribution
 
-    bool partial_servers;         // if true, jobs can utilize portions of servers; otherwise, they need a whole number of servers to operate
+    
 
     std::vector<std::pair<size_t, double>> history; // vector containing recent (last insert/delete changes) server allocations
 
@@ -125,7 +126,7 @@ private:
     void get_group_server_count(const std::string &group, std::vector<std::pair<size_t, double>> &input);
 
     // gets smallest group id for any given job
-    std::string get_group_id(RCGREEDY_Job &job);
+    const std::string get_group_id(RCGREEDY_Job &job);
 
     // reallocate from group downwards
     void partial_realloc(const std::string &group); 
@@ -135,7 +136,7 @@ private:
 
     // returns the optimal number of servers to allocate to the less parallelizable class
     // p1 is the less parallelizable class
-    inline size_t optimal_server_count(double p1, size_t jobs_count_1, double p2, size_t jobs_count_2, size_t total_servers) {
+    const inline size_t optimal_server_count(double p1, size_t jobs_count_1, double p2, size_t jobs_count_2, size_t total_servers) {
         size_t a1 = 0;
         double max_value = 0.0;
         double current_value;

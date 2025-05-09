@@ -113,7 +113,7 @@ void RCGREEDY::delete_job(RCGREEDY_Job &job, bool forced_local_realloc){
         }
     }
 
-    if (forced_local_realloc) {
+    if (forced_local_realloc && !lowest_job_level.empty()) {
         groups[lowest_job_level].allocated_servers += realloc_server_count;
         max_update += 1;
         partial_realloc(lowest_job_level);
@@ -123,13 +123,18 @@ void RCGREEDY::delete_job(RCGREEDY_Job &job, bool forced_local_realloc){
     }
 }
 
-double RCGREEDY::get_server_count(RCGREEDY_Job &job) {
+const double RCGREEDY::get_server_count(RCGREEDY_Job &job) {
     if (job_group_assignments.find(job) == job_group_assignments.end()) {
         std::cerr << "Error finding job " << job.id << ". Job doesn't exist." << std::endl;
-        return;
-    }
+        return -1.0;
+    } 
 
     std::string group = job_group_assignments[job];
+
+    if (groups[group].job_count == 0) {
+        std::cerr << "Error, group " << group << "has no jobs" << std::endl;
+        return -1.0;
+    }
 
     if (groups[group].job_count == 1) return static_cast<double>(groups[group].allocated_servers);
 
@@ -178,6 +183,11 @@ void RCGREEDY::get_all_server_count(std::vector<std::pair<size_t, double>> &inpu
 
 void RCGREEDY::get_group_server_count(const std::string &group, std::vector<std::pair<size_t, double>> &input) {
 
+    if (groups[group].job_count == 0) {
+        std::cerr << "Error, group " << group << "has no jobs" << std::endl;
+        return;
+    }
+
     double server_alloc = 0.0;
     size_t remainder = 0;
     bool flip = true;
@@ -206,7 +216,7 @@ void RCGREEDY::get_group_server_count(const std::string &group, std::vector<std:
     return;
 }
 
-std::vector<std::pair<size_t, double>> RCGREEDY::get_server_changes(RCGREEDY_Job &job) {
+const std::vector<std::pair<size_t, double>> RCGREEDY::get_server_changes(RCGREEDY_Job &job) {
     return history;
 }
 
@@ -235,7 +245,7 @@ void RCGREEDY::generate_mappings(double c_p_min, double c_p_max, std::string c_s
 
 }
 
-std::string RCGREEDY::get_group_id(RCGREEDY_Job &job){
+const std::string RCGREEDY::get_group_id(RCGREEDY_Job &job){
     if (job_group_assignments.find(job) != job_group_assignments.end()) {
         return job_group_assignments[job];
     }
@@ -289,12 +299,14 @@ void RCGREEDY::partial_realloc(const std::string &group){
         return partial_realloc(group0);
     }
 
+    // generate optimal servers for the lower group via the GREEDY* formula
     size_t a1 = optimal_server_count(groups[group0].total_p / groups[group0].job_count,
                                      groups[group0].job_count, 
                                      groups[group1].total_p / groups[group1].job_count,
                                      groups[group1].job_count,
                                      groups[group].allocated_servers);
     
+    // allocate the servers
     groups[group0].allocated_servers = a1;
     groups[group1].allocated_servers = groups[group].allocated_servers - a1;
     

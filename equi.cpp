@@ -22,15 +22,15 @@ void EQUI::delete_job(size_t job_id) {
     }
 }
 
-size_t EQUI::get_allocation(size_t job_id) const{
+double EQUI::get_allocation(size_t job_id) const{
     
     // if partial servers, this is trivial
     if (partial_servers){ 
-        return static_cast<double>(partial_servers) / jobs.size();
+        return static_cast<double>(server_count) / jobs.size();
     }
 
-    double server_alloc = static_cast<double>(partial_servers / jobs.size()) + 1;
-    size_t remainder = partial_servers % jobs.size();
+    size_t server_alloc = server_count / jobs.size() + 1;
+    size_t remainder = server_count % jobs.size();
     
 
     // if it is one of the first jobs, it gets the remainder servers, otherwise it does not
@@ -49,10 +49,10 @@ void EQUI::get_all_allocations(std::vector<std::pair<size_t, double>> &input) {
 
     // if partial servers, this is trivial
     if (partial_servers){ 
-        server_alloc = static_cast<double>(partial_servers) / jobs.size();
+        server_alloc = static_cast<double>(server_count) / jobs.size();
     } else {
-        server_alloc = static_cast<double>(partial_servers / jobs.size()) + 1;
-        remainder = partial_servers % jobs.size();
+        server_alloc = static_cast<double>(server_count / jobs.size()) + 1;
+        remainder = server_count % jobs.size();
         flip = false;
     }
     
