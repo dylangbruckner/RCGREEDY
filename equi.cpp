@@ -23,6 +23,7 @@ void EQUI::delete_job(size_t job_id) {
 }
 
 double EQUI::get_allocation(size_t job_id) const{
+    if (!jobs.size()) return 0;
     
     // if partial servers, this is trivial
     if (partial_servers){ 
@@ -43,6 +44,8 @@ double EQUI::get_allocation(size_t job_id) const{
 }
 
 void EQUI::get_all_allocations(std::vector<std::pair<size_t, double>> &input) {
+    if (!jobs.size()) return;
+    
     double server_alloc = 0.0;
     size_t remainder = 0;
     bool flip = true;

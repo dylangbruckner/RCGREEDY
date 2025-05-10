@@ -1,9 +1,11 @@
 #include "rcgreedy_base.hpp"
 
 
-RCGREEDY::RCGREEDY(size_t servers, int max_depth, double average_size, bool partial_server_allocs = false) : 
-    server_count(servers), current_depth(std::max(0, std::min(max_depth, RCGREEDY::MAX_DEPTH))), 
-    maximization_constant(1/average_size), partial_servers(partial_server_allocs) {
+RCGREEDY::RCGREEDY(size_t servers, size_t max_depth, double average_size, bool partial_server_allocs) : 
+    current_depth(std::min(max_depth, RCGREEDY::MAX_DEPTH)),
+    partial_servers(partial_server_allocs),
+    server_count(servers),  
+    maximization_constant(1/average_size) {
     initalize_groups();
 
     // initally, give all of servers to the top group
@@ -12,7 +14,7 @@ RCGREEDY::RCGREEDY(size_t servers, int max_depth, double average_size, bool part
 
 void RCGREEDY::full_realloc() {
     max_update += 1;
-    history.clear(); // new action, remake history vector
+    history.clear();
     if (!groups[""].job_count) return;
     partial_realloc("");
 }
@@ -39,7 +41,8 @@ void RCGREEDY::add_job(RCGREEDY_Job &job, bool forced_local_realloc) {
             current_update = groups[c_level].update_count;
 
             // if servers found, update for local realloc
-            if (groups[c_level].allocated_servers) {
+            if (groups[c_level].allocated_servers > groups[c_level].job_count
+               || (groups[c_level].allocated_servers && partial_servers)) {
                 last_level_w_servers = c_level;
             }
 
@@ -73,13 +76,6 @@ void RCGREEDY::delete_job(RCGREEDY_Job &job, bool forced_local_realloc){
     }
 
     std::string group = job_group_assignments[job];
-    job_group_assignments.erase(job); // erase the mapping
-
-    // if erase failed, element doesn't exist here
-    if (!id_to_jobs[group].erase(job)) {
-        std::cerr << "Error deleting job " << job.id << ". Job not found in group." << std::endl;
-        return;
-    }
 
     history.clear(); // new action, remake history vector
     std::string c_level;
@@ -94,8 +90,8 @@ void RCGREEDY::delete_job(RCGREEDY_Job &job, bool forced_local_realloc){
     }
 
     // move up the allocation 
-    for (size_t len = group.size(); len >= 0; --len) {
-        c_level = group.substr(0, len);
+    for (size_t len = group.size() + 1; len > 0; --len) {
+        c_level = group.substr(0, len - 1);
 
         // edit group information
         groups[c_level].job_count -= 1;
@@ -105,25 +101,37 @@ void RCGREEDY::delete_job(RCGREEDY_Job &job, bool forced_local_realloc){
             // see if this is level for realloc
             if (groups[c_level].job_count) {
                 lowest_job_level = (group[c_level.size()] == '1') ? c_level + "0" : c_level + "1";
-            } else {
+            } else if (c_level != "") {
                 // remove servers from level for realloc
                 groups[c_level].allocated_servers -= realloc_server_count;
             }
             
         }
+        if (len == 0) break;
     }
+
+    // if erase failed, element doesn't exist here
+    if (!id_to_jobs[group].erase(job)) {
+        std::cerr << "Error deleting job " << job.id << ". Job not found in group." << std::endl;
+        return;
+    }
+
 
     if (forced_local_realloc && !lowest_job_level.empty()) {
         groups[lowest_job_level].allocated_servers += realloc_server_count;
         max_update += 1;
         partial_realloc(lowest_job_level);
+        job_group_assignments.erase(job); // erase the mapping
     } else {
         // add history of local realloc isn't performed
-        get_job_group_server_count(job, history);
+        if (groups[group].job_count) {
+            get_job_group_server_count(job, history);
+        }
+        job_group_assignments.erase(job); // erase the mapping
     }
 }
 
-const double RCGREEDY::get_server_count(RCGREEDY_Job &job) {
+double RCGREEDY::get_server_count(RCGREEDY_Job &job) {
     if (job_group_assignments.find(job) == job_group_assignments.end()) {
         std::cerr << "Error finding job " << job.id << ". Job doesn't exist." << std::endl;
         return -1.0;
@@ -174,7 +182,9 @@ void RCGREEDY::get_all_server_count(std::vector<std::pair<size_t, double>> &inpu
     
     // iterate through only the lowest level ids
     for (const auto& pair : id_to_jobs) {
-        get_group_server_count(pair.first, input);
+        if (!pair.second.empty()) { // only process groups with jobs
+            get_group_server_count(pair.first, input);
+        }
     }
 
     return;
@@ -216,13 +226,12 @@ void RCGREEDY::get_group_server_count(const std::string &group, std::vector<std:
     return;
 }
 
-const std::vector<std::pair<size_t, double>> RCGREEDY::get_server_changes(RCGREEDY_Job &job) {
+std::vector<std::pair<size_t, double>> RCGREEDY::get_server_changes() {
     return history;
 }
 
 void RCGREEDY::initalize_groups(){
     groups[""] = Group{0, server_count, 0, 0.0};
-    history;
     generate_mappings(0.0, 1.0, "", current_depth);
 }
 
@@ -245,7 +254,7 @@ void RCGREEDY::generate_mappings(double c_p_min, double c_p_max, std::string c_s
 
 }
 
-const std::string RCGREEDY::get_group_id(RCGREEDY_Job &job){
+std::string RCGREEDY::get_group_id(RCGREEDY_Job &job){
     if (job_group_assignments.find(job) != job_group_assignments.end()) {
         return job_group_assignments[job];
     }
@@ -254,15 +263,15 @@ const std::string RCGREEDY::get_group_id(RCGREEDY_Job &job){
     double diff = .5;
     std::string output = "";
 
-    for (int i = 0; i < current_depth; ++i) {
-        if (job.p >= p_min + diff) {
+    for (size_t i = 0; i < current_depth; ++i) {
+
+        if (job.p >= p_min + diff) {         // <-- WAS COMPARING TO p_min + diff
             p_min += diff;
             output += "1";
         } else {
             p_max -= diff;
             output += "0";
         }
-
         diff /= 2;
     }
 
@@ -272,6 +281,7 @@ const std::string RCGREEDY::get_group_id(RCGREEDY_Job &job){
 }
 
 void RCGREEDY::partial_realloc(const std::string &group){
+    
     size_t depth = group.size();
 
     // update_count increase for group
@@ -287,7 +297,14 @@ void RCGREEDY::partial_realloc(const std::string &group){
     std::string group1 = group + "1";
 
     // if one group has no jobs, assign all jobs to the other group
-    if (!groups[group0].job_count) {
+    if (!groups[group0].job_count && !groups[group1].job_count) {
+        groups[group0].allocated_servers = 0;
+        groups[group0].update_count = max_update;
+        groups[group1].allocated_servers = 0;
+        groups[group1].update_count = max_update;
+        return;
+    }
+    else if (!groups[group0].job_count) {
         groups[group1].allocated_servers = groups[group].allocated_servers;
         groups[group0].allocated_servers = 0;
         groups[group0].update_count = max_update;

@@ -7,10 +7,10 @@
 // jobs (for use in simulations)
 struct Job {
     size_t job_id;           // used by the scheduler to differentiate jobs
-    long double arrival_time;
+    long double last_queue_insertion;
     double size;             // exp distributed
     double remaining_size;   // hidden from scheduler, used for simulation
-    int current_group;       // the server group this job is assigned to
+    double servers_allocated;       // the server group this job is assigned to
     double p;                // speedup paramater
 };
 

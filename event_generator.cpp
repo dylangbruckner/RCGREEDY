@@ -12,6 +12,7 @@ boost::heap::priority_queue<Event, boost::heap::compare<Compare_Event>> generate
 
     // tracks current time
     long double elapsed_time = 0.0;
+    double size;
 
     boost::heap::priority_queue<Event, boost::heap::compare<Compare_Event>> pq;
 
@@ -19,7 +20,8 @@ boost::heap::priority_queue<Event, boost::heap::compare<Compare_Event>> generate
 
         // generate space between events and job size, add to pq
         elapsed_time += arrival(generator);
-        pq.push(Event{ARRIVAL, elapsed_time, Job{i, 0.0, job_size(generator), 0.0, -1, speedup(generator)}});
+        size = job_size(generator);
+        pq.push(Event{ARRIVAL, elapsed_time, Job{i, elapsed_time, size, size, 0.0, speedup(generator)}});
     }
 
     return pq;

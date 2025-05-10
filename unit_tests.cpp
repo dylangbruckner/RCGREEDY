@@ -16,8 +16,7 @@ void print_result(const std::string& test_name, bool passed, const std::string& 
     }
 }
 
-int unit_tests(size_t test_start, size_t test_end) {
-    (void)test_start; (void)test_end; // Ignore arguments
+int unit_tests() {
 
     // ---- Test 1: EQUI insertion and deletion ----
     {
@@ -146,6 +145,23 @@ int unit_tests(size_t test_start, size_t test_end) {
         bool all_ok = true;
         for (auto& p : allocs) all_ok &= double_eq(p.second, expected);
         print_result("EQUI Fractional Precision", all_ok, std::to_string(expected), std::to_string(allocs[0].second));
+    }
+
+    // test 11
+    {
+        RCGREEDY rcg(100, 5, 1, true);
+        RCGREEDY::RCGREEDY_Job job{1, 0.00889474};
+        rcg.add_job(job, true);
+        RCGREEDY::RCGREEDY_Job job2{2, 0.86};
+        rcg.add_job(job2, true);
+        std::vector<std::pair<size_t, double>> allocs = rcg.get_server_changes();
+        std::vector<std::pair<size_t, double>> allocs2;
+        rcg.get_all_server_count(allocs2);
+        bool ok = true;
+        print_result(std::to_string(allocs2[0].second), ok, "1000000.0", std::to_string(allocs[0].second));
+        print_result(std::to_string(allocs2[1].second), ok, "1000000.0", std::to_string(allocs[1].second));
+        print_result(std::to_string(allocs[0].second), ok, "1000000.0", std::to_string(allocs[0].second));
+        print_result(std::to_string(allocs[1].second), ok, "1000000.0", std::to_string(allocs[1].second));
     }
 
     return 0;

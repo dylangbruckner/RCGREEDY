@@ -11,7 +11,7 @@
 
 const double EPSILON = 1e-6; // used for floating point calculations
 class RCGREEDY {
-    static constexpr int MAX_DEPTH = 10;  // maximum recursion depth of our scheduler 
+    static constexpr size_t MAX_DEPTH = 10;  // maximum recursion depth of our scheduler 
 
 public:
     struct RCGREEDY_Job {
@@ -29,7 +29,7 @@ public:
         }
     };
 
-    RCGREEDY(size_t servers, int max_depth, double average_size, bool partial_server_allocs = false);
+    RCGREEDY(size_t servers, size_t max_depth, double average_size, bool partial_server_allocs = false);
 
     /*
     * performa a full reallocation of the entire system, based on the RCGREEDY
@@ -55,7 +55,7 @@ public:
     * get job_group_server_count, and get_all_server_count are more 
     * efficient
     */
-    const double get_server_count(RCGREEDY_Job &job);
+    double get_server_count(RCGREEDY_Job &job);
 
     /*
     * adds the server count allocated to any job group to the given vector, as a vector of 
@@ -69,21 +69,20 @@ public:
     */
     void get_all_server_count(std::vector<std::pair<size_t, double>> &input);
     
-    // todo maybe add an option to turn this off
     /*
     * returns a vector of any jobs (as ids) and their allocations (as doubles) that have changed
     * in the last insertion/deletion or server update. 
     */
-    const std::vector<std::pair<size_t, double>> get_server_changes(RCGREEDY_Job &job);
+    std::vector<std::pair<size_t, double>> get_server_changes();
     /*
     * returns the speedup factor of any job with p as the speedup 
     * parameter and servers allocated servers
     */
-    const inline double speedup_factor(double p, double servers) {
+    inline double speedup_factor(double p, double servers) {
         return 1.0 / ((p / servers) + 1 - p);
     }
     
-    const int current_depth;
+    const size_t current_depth;
     const bool partial_servers;         // if true, jobs can utilize portions of servers; otherwise, they need a whole number of servers to operate
 private:
 
@@ -126,25 +125,20 @@ private:
     void get_group_server_count(const std::string &group, std::vector<std::pair<size_t, double>> &input);
 
     // gets smallest group id for any given job
-    const std::string get_group_id(RCGREEDY_Job &job);
+    std::string get_group_id(RCGREEDY_Job &job);
 
     // reallocate from group downwards
     void partial_realloc(const std::string &group); 
 
-    // same thing as above but with parallelization
-    void partial_realloc_paralellization(const std::string &group); // todo
-
     // returns the optimal number of servers to allocate to the less parallelizable class
     // p1 is the less parallelizable class
-    const inline size_t optimal_server_count(double p1, size_t jobs_count_1, double p2, size_t jobs_count_2, size_t total_servers) {
+    inline size_t optimal_server_count(double p1, size_t jobs_count_1, double p2, size_t jobs_count_2, size_t total_servers) {
         size_t a1 = 0;
         double max_value = 0.0;
         double current_value;
-        double const_1 = jobs_count_1 * maximization_constant;
-        double const_2 = jobs_count_2 * maximization_constant;
-
+    
         for (size_t temp_a1 = 0; temp_a1 <= total_servers; ++temp_a1) {
-            current_value = const_1 * speedup_factor(p1, temp_a1 / jobs_count_1) + const_2 * speedup_factor(p2, (total_servers - temp_a1) / jobs_count_2);
+            current_value = maximization_constant * (jobs_count_1 * speedup_factor(p1, static_cast<double>(temp_a1) / jobs_count_1) + jobs_count_2 * speedup_factor(p2, static_cast<double>(total_servers - temp_a1) / jobs_count_2));
 
             // if current value is greater than or equal to max value, take higher a1 value
             if (max_value - current_value < EPSILON) {

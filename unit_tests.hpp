@@ -7,7 +7,7 @@
 
 const double EPS = 1e-6;
 
-int unit_tests(size_t test_start, size_t test_end);
+int unit_tests();
 
 
 
